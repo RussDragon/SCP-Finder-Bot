@@ -12,12 +12,10 @@ namespace SCP
     public async Task<string> GetText(string arg)
     {
       var (link, title) = await this._library.GetRandomPageAsync();
-      if (string.IsNullOrWhiteSpace(link))
-        return "Sorry, I don't know such SCP";
-      if (link == "ERROR")
+      if (link == "ERROR" || string.IsNullOrWhiteSpace(link) || string.IsNullOrWhiteSpace(title))
         return "Something went wrong with bot's logic, please tell author";
       
-      return $"[{title.Escape(ConfigClass.ForbiddenCharacters)}]" + "(" + link + ")";
+      return $"[{title.Escape(Config.ForbiddenCharacters)}]" + "(" + link + ")";
     }
   }
 }
