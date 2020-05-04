@@ -6,7 +6,7 @@ namespace SCP
   {
     public Task<string> GetText(string arg)
     {
-      return Task.FromResult("/random, /s \\*object number\\*");
+      return Task.FromResult("/random, /o \\*object number\\*, /s \\*search query\\*");
     }
   }
 }

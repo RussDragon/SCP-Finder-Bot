@@ -15,7 +15,7 @@ namespace SCP
       if (string.IsNullOrWhiteSpace(link))
         return Task.FromResult("Sorry, I don't know such SCP");
       
-      return Task.FromResult($"[{title.Escape(ConfigClass.ForbiddenCharacters)}]" + "(" + link + ")");
+      return Task.FromResult($"[{title.Escape(Config.ForbiddenCharacters)}]" + "(" + link + ")");
     }
   }
 }
