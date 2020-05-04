@@ -2,11 +2,11 @@ using System.Threading.Tasks;
 
 namespace SCP
 {
-  public class StartStrategy : IStrategy
+  public class HelpStrategy : IStrategy
   {
     public Task<string> GetText(string arg)
     {
-      return Task.FromResult("/random, /o \\*object number\\*, /s \\*search query\\*");
+      return Task.FromResult("/random, /o \\*object number\\*, /s \\*search query\\*, /help");
     }
   }
 }
