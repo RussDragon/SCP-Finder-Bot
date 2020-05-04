@@ -7,22 +7,23 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web;
 
+//TODO Add HttpClient response codes & headers verification
 namespace SCP
 {
   public class ScpLibrary
   {
-    private Dictionary<string, Tuple<string, string>> _objectLinks = 
+    private Dictionary<string, Tuple<string, string>> _objectLinks =
       new Dictionary<string, Tuple<string, string>>();
-    
+
     public async Task LoadLibraryAsync()
     {
       var regex = new Regex("(scp)", RegexOptions.IgnoreCase);
       Console.WriteLine("Parsing articles links...");
-      
+
       using (var httpClient = new HttpClient())
       {
         var downloadTasks =
-          ConfigClass.PageLinks.Select(t => httpClient.GetStringAsync(t)).ToList();
+          Config.PageLinks.Select(t => httpClient.GetStringAsync(t)).ToList();
         var responses = await Task.WhenAll(downloadTasks);
 
         foreach (var html in responses)
@@ -45,7 +46,7 @@ namespace SCP
             else
               id = node.InnerHtml;
 
-            var link = "https://scpfoundation.net" + node.Attributes["href"].Value;
+            var link = Config.HomePage + node.Attributes["href"].Value;
 
             var title = "";
             title = node.NextSibling != null ? node.NextSibling.InnerHtml : node.InnerHtml;
@@ -54,7 +55,11 @@ namespace SCP
               .Replace("—", "")
               .Replace("- ", " ")
               .Trim();
-            this._objectLinks[id.ToLower()] = new Tuple<string, string>(link, title);
+
+            if (!this._objectLinks.ContainsKey(id.ToLower()))
+              this._objectLinks[id.ToLower()] = new Tuple<string, string>(link, title);
+            else
+              Console.WriteLine($"Error! {id} is almost rewritten, {title}");
           }
         }
       }
@@ -68,30 +73,84 @@ namespace SCP
       return !this._objectLinks.ContainsKey(id) ? new Tuple<string, string>("", "") : this._objectLinks[id];
     }
 
+    public async Task<List<Tuple<string, string>>> SearchSite(string query, int amount = 5)
+    {
+      var resultsList = new List<Tuple<string, string>>();
+
+      using (var httpClient = new HttpClient())
+      {
+        var encodedQuery = HttpUtility.UrlEncode(query);
+        var response = await httpClient.GetAsync(Config.SearchPage + encodedQuery);
+
+        var html = await response.Content.ReadAsStringAsync();
+        var htmlDoc = new HtmlDocument();
+        htmlDoc.LoadHtml(html);
+        var searchRootNode =
+          htmlDoc.DocumentNode.SelectSingleNode(xpath: "//div[@class='search-results']");
+
+        // C'mon, remove all this ifs and make correct problem detection, you, fool! 
+        if (searchRootNode != null)
+        {
+          var searchResultsNodes = searchRootNode.SelectNodes(".//div[@class='item']");
+
+          if (searchResultsNodes != null)
+          {
+            amount = (amount > searchResultsNodes.Count) ? searchResultsNodes.Count : amount;
+            for (var i = 0; i < amount; i++)
+            {
+              var searchItemNode = searchResultsNodes[i];
+              var titleNode = searchItemNode.SelectSingleNode(".//div[@class='title']");
+              var linkNode = titleNode.SelectSingleNode(".//a");
+
+              var link = linkNode.Attributes["href"].Value;
+              var linkName =
+                HttpUtility.HtmlDecode(linkNode.InnerHtml)
+                  .TrimHtmlTags()
+                  .Trim();
+
+              resultsList.Add(new Tuple<string, string>(link, linkName));
+            }
+
+            return resultsList;
+          }
+          
+          return new List<Tuple<string, string>> 
+              {new Tuple<string, string>("", "")};
+        }
+        
+        return new List<Tuple<string, string>>
+          {new Tuple<string, string>(Config.HomePage, "Error occured")};
+      }
+    }
+
     public async Task<Tuple<string, string>> GetRandomPageAsync()
     {
       try
       {
         using (var httpClient = new HttpClient())
         {
-          var firstResponse = await httpClient.GetAsync(ConfigClass.RandPage);
+          var firstResponse = await httpClient.GetAsync(Config.RandPage);
           var redirectedUrl = firstResponse.Headers.Location.AbsoluteUri;
 
-          var response = await httpClient.GetAsync(redirectedUrl);
+          var secondResponse = await httpClient.GetAsync(redirectedUrl);
 
-          var html = await response.Content.ReadAsStringAsync();
+          var html = await secondResponse.Content.ReadAsStringAsync();
           var htmlDoc = new HtmlDocument();
           htmlDoc.LoadHtml(html);
 
           var node = htmlDoc.DocumentNode.SelectSingleNode("//div[@id='page-title']");
 
-          return new Tuple<string, string>(redirectedUrl, HttpUtility.HtmlDecode(node.InnerHtml).Trim());
+          return
+            new Tuple<string, string>(
+              redirectedUrl,
+              HttpUtility.HtmlDecode(node.InnerHtml).TrimHtmlTags().Trim()
+            );
         }
       }
       catch (Exception e)
       {
         return new Tuple<string, string>("ERROR", "");
-      };
+      }
     }
   }
 }
