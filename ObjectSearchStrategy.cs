@@ -12,7 +12,7 @@ namespace SCP
     public Task<string> GetText(string arg)
     {
       if (string.IsNullOrEmpty(arg))
-        return Task.FromResult("Please, specify object number.");
+        return Task.FromResult("Please, specify object number");
       
       var (link, title) = this._library.GetObjectLink(arg);
       if (string.IsNullOrWhiteSpace(link))
