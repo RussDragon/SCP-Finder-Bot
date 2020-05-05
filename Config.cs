@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace SCP
 {
   public static class Config
@@ -8,6 +6,9 @@ namespace SCP
       { '_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!' };
 
     public const string HomePage = "http://scpfoundation.net";
+    //EXPERIMENTAL
+    public const string ObjectsListPage =
+      "http://scpfoundation.net/system:page-tags/tag/%D0%BE%D0%B1%D1%8A%D0%B5%D0%BA%D1%82#pages";
     public static readonly string[] PageLinks = new []
     {
       HomePage + "/scp-list",
