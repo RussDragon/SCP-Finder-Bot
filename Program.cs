@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Bot;
 using Telegram.Bot.Args;
+using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
 //TODO: Add better error assertion to strategies
@@ -13,6 +14,7 @@ using Telegram.Bot.Types.Enums;
 //TODO: Add english foundation and other wikidots sites
 //TODO: Fix spanish and chinese objects (regex)
 //TODO: Parse pages for site search for titles fix
+//TODO: Add description to search results
 namespace SCP
 {
   public static class StringExtension
@@ -42,6 +44,7 @@ namespace SCP
   class Program {
     private static ITelegramBotClient _botClient;
     private static readonly ScpLibrary Library = new ScpLibrary();
+    private static User _me; 
 
     private static readonly Dictionary<string, IStrategy> CommandsStrategies =
       new Dictionary<string, IStrategy>()
@@ -56,12 +59,10 @@ namespace SCP
     static async Task Main()
     {
       await Library.LoadLibraryAsync();
-
+      
       _botClient = new TelegramBotClient(Config.Token);
-      var me = await _botClient.GetMeAsync();
-      Console.WriteLine(
-        $"Hello, World! I am user {me.Id} and my name is {me.FirstName}."
-      );
+      _me = await _botClient.GetMeAsync();
+      Console.WriteLine($"Hello! I am user {_me.Id} and my name is {_me.Username}.");
       
       _botClient.OnMessage += Bot_OnMessage;
       _botClient.StartReceiving();
@@ -73,6 +74,7 @@ namespace SCP
       Console.WriteLine($"Received a text message in chat {e.Message.Chat.Username}.");
       
       if (e.Message.Text[0] != '/') return;
+      e.Message.Text = e.Message.Text.Replace($"@{_me.Username}", "");
       var args = e.Message.Text.Split(' ', 2);
 
       string textMessage;
@@ -83,7 +85,7 @@ namespace SCP
       }
       else
         textMessage = "Sorry, I don't know what do you want from me";
-
+      
       await _botClient.SendTextMessageAsync(
         chatId: e.Message.Chat,
         text: textMessage,
