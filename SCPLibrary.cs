@@ -17,51 +17,44 @@ namespace SCP
 
     public async Task LoadLibraryAsync()
     {
-      var hrefRegex = new Regex("(scp)", RegexOptions.IgnoreCase);
-      var objectRegex = new Regex("^SCP-(.*)", RegexOptions.IgnoreCase);
+      var objectRegex = new Regex("^SCP-(.*?)\\s", RegexOptions.IgnoreCase);
+      var priorityRegex = new Regex("(deleted|sandbox)", RegexOptions.IgnoreCase);
       Console.WriteLine("Parsing articles links...");
 
       using (var httpClient = new HttpClient())
       {
-        var downloadTasks =
-          Config.PageLinks.Select(t => httpClient.GetStringAsync(t)).ToList();
-        var responses = await Task.WhenAll(downloadTasks);
+        var html = await httpClient.GetStringAsync(Config.ObjectsListPage);
 
-        foreach (var html in responses)
+        var htmlDoc = new HtmlDocument();
+        htmlDoc.LoadHtml(html);
+        // TODO: Add error assertion
+
+        var rootNode = htmlDoc.DocumentNode.SelectSingleNode("//div[@class='pages-list']");
+        var itemList = rootNode.SelectNodes(".//div[@class='pages-list-item']");
+
+        foreach (var item in itemList)
         {
-          var htmlDoc = new HtmlDocument();
-          htmlDoc.LoadHtml(html);
-          // TODO: Add error assertion
+          var node = item.SelectSingleNode(".//a");
+          var id = objectRegex.Match(node.InnerHtml).Groups[1].Value;
+          if (string.IsNullOrWhiteSpace(id))
+            id = node.InnerHtml;
 
-          var rootNode = htmlDoc.DocumentNode.SelectSingleNode("//div[@id='page-content']");
-          var nodeList =
-            rootNode.SelectNodes(".//a")
-              .Where(a => hrefRegex.IsMatch(a.Attributes["href"].Value))
-              .ToList<HtmlNode>();
-          
-          foreach (var node in nodeList)
-          {
-            var id = objectRegex.Match(node.InnerHtml).Groups[1].Value;
-            if (string.IsNullOrWhiteSpace(id))
-              id = node.InnerHtml;
-            
-            var link = Config.HomePage + node.Attributes["href"].Value;
+          var link = Config.HomePage + node.Attributes["href"].Value;
 
-            // If we have some tags after link, span or #text for example
-            var title = node.NextSibling != null ? node.NextSibling.InnerHtml : node.InnerHtml;
-            if (string.IsNullOrWhiteSpace(title))
-              title = node.InnerHtml;
-            
-            title = HttpUtility.HtmlDecode(title)
-              .Replace("—", "")
-              .Replace("- ", " ")
-              .Trim();
+          // If we have some tags after link, span or #text for example
+          var title = node.NextSibling != null ? node.NextSibling.InnerHtml : node.InnerHtml;
+          if (string.IsNullOrWhiteSpace(title))
+            title = node.InnerHtml;
 
-            if (!_objectLinks.ContainsKey(id.ToLower()))
-              _objectLinks[id.ToLower()] = new Tuple<string, string>(link, title);
-            else
-              Console.WriteLine($"[WARNING] Attempt to rewrite {id}, {title}");
-          }
+          title = HttpUtility.HtmlDecode(title).Trim();
+
+          if (!_objectLinks.ContainsKey(id.ToLower()) || 
+              priorityRegex.IsMatch(_objectLinks[id.ToLower()].Item1) && !priorityRegex.IsMatch(link))
+            _objectLinks[id.ToLower()] = new Tuple<string, string>(link, title);
+          else
+            Console.WriteLine($"[WARNING]: Attempt to replace an object " +
+                              $"'{_objectLinks[id.ToLower()].Item2}' with an id '{id}' to an object '{title}'. " +
+                              $"\nLinks: [{_objectLinks[id.ToLower()].Item1}] against [{link}]");
         }
       }
 
@@ -114,11 +107,11 @@ namespace SCP
 
             return resultsList;
           }
-          
-          return new List<Tuple<string, string>> 
-              {new Tuple<string, string>("", "")};
+
+          return new List<Tuple<string, string>>
+            {new Tuple<string, string>("", "")};
         }
-        
+
         return new List<Tuple<string, string>>
           {new Tuple<string, string>(Config.HomePage, "Error occured")};
       }
