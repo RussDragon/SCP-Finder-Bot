@@ -17,7 +17,8 @@ namespace SCP
 
     public async Task LoadLibraryAsync()
     {
-      var regex = new Regex("(scp)", RegexOptions.IgnoreCase);
+      var hrefRegex = new Regex("(scp)", RegexOptions.IgnoreCase);
+      var objectRegex = new Regex("^SCP-(.*)", RegexOptions.IgnoreCase);
       Console.WriteLine("Parsing articles links...");
 
       using (var httpClient = new HttpClient())
@@ -35,31 +36,31 @@ namespace SCP
           var rootNode = htmlDoc.DocumentNode.SelectSingleNode("//div[@id='page-content']");
           var nodeList =
             rootNode.SelectNodes(".//a")
-              .Where(a => regex.IsMatch(a.Attributes["href"].Value))
+              .Where(a => hrefRegex.IsMatch(a.Attributes["href"].Value))
               .ToList<HtmlNode>();
-
+          
           foreach (var node in nodeList)
           {
-            string id;
-            if (Regex.IsMatch(node.InnerHtml, @"\d\d\d\d?\D*"))
-              id = Regex.Match(node.InnerHtml, @"\d\d\d\d?\D*").Value;
-            else
+            var id = objectRegex.Match(node.InnerHtml).Groups[1].Value;
+            if (string.IsNullOrWhiteSpace(id))
               id = node.InnerHtml;
-
+            
             var link = Config.HomePage + node.Attributes["href"].Value;
 
-            var title = "";
-            title = node.NextSibling != null ? node.NextSibling.InnerHtml : node.InnerHtml;
-
+            // If we have some tags after link, span or #text for example
+            var title = node.NextSibling != null ? node.NextSibling.InnerHtml : node.InnerHtml;
+            if (string.IsNullOrWhiteSpace(title))
+              title = node.InnerHtml;
+            
             title = HttpUtility.HtmlDecode(title)
               .Replace("—", "")
               .Replace("- ", " ")
               .Trim();
 
-            if (!this._objectLinks.ContainsKey(id.ToLower()))
-              this._objectLinks[id.ToLower()] = new Tuple<string, string>(link, title);
+            if (!_objectLinks.ContainsKey(id.ToLower()))
+              _objectLinks[id.ToLower()] = new Tuple<string, string>(link, title);
             else
-              Console.WriteLine($"Error! {id} is almost rewritten, {title}");
+              Console.WriteLine($"[WARNING] Attempt to rewrite {id}, {title}");
           }
         }
       }
